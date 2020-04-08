@@ -3,15 +3,21 @@ const bcript = require('bcrypt');
 const _ = require('underscore');
 
 const Usuario = require('../models/usuario');
+const {
+    verificarToken,
+    verificarAdmin_rol
+} = require('../middlewares/autenticacion');
 
 const app = express();
 
-app.get('/usuario', (req, res) => {
+app.get('/usuario', verificarToken, (req, res) => {
     let desde = req.query.desde || 0;
     desde = Number(desde);
     let limite = req.query.limite || 5;
     limite = Number(limite);
-    Usuario.find({estado: true}, 'nombre email rol estado google img')
+    Usuario.find({
+            estado: true
+        }, 'nombre email rol estado google img')
         .skip(desde)
         .limit(limite)
         .exec((err, usuarios) => {
@@ -21,7 +27,9 @@ app.get('/usuario', (req, res) => {
                     err
                 });
             }
-            Usuario.count({estado: true}, (err, conteo) => {
+            Usuario.count({
+                estado: true
+            }, (err, conteo) => {
                 res.json({
                     ok: true,
                     usuarios,
@@ -32,7 +40,7 @@ app.get('/usuario', (req, res) => {
         });
 });
 
-app.post('/usuario', (req, res) => {
+app.post('/usuario', [verificarToken, verificarAdmin_rol], (req, res) => {
     let body = req.body;
 
     let usuario = new Usuario({
@@ -57,16 +65,17 @@ app.post('/usuario', (req, res) => {
     });
 });
 
-app.put('/usuario/:id', (req, res) => {
-    let id = req.params.id;
-    let body = _.pick(req.body, ['nombre', 'email', 'img', 'rol', 'estado']);
+app.put('/usuario/:id', [verificarToken, verificarAdmin_rol], (req, res) => {
+    let id = req.usuario.id;
+    let body = _.pick(req.usuario, ['nombre', 'email', 'img', 'rol', 'estado']);
 
     // delete body.password;
     // delete body.google;
 
     Usuario.findByIdAndUpdate(id, body, {
         new: true,
-        runValidators: true
+        runValidators: true,
+        context: 'query'
     }, (err, usuarioDB) => {
         if (err) {
             return res.status(400).json({
@@ -82,13 +91,15 @@ app.put('/usuario/:id', (req, res) => {
     });
 });
 
-app.delete('/usuario/:id', (req, res) => {
+app.delete('/usuario/:id', [verificarToken, verificarAdmin_rol], (req, res) => {
     let id = req.params.id;
     let cambiarEstado = {
         estado: false
     }
 
-    Usuario.findByIdAndUpdate(id, cambiarEstado, {new: true}, (err, usuarioBorrado) => {
+    Usuario.findByIdAndUpdate(id, cambiarEstado, {
+        new: true
+    }, (err, usuarioBorrado) => {
         if (err) {
             return res.status(400).json({
                 ok: false,
